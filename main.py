@@ -210,6 +210,254 @@ Error Handling and Recovery:
 Network Task Analysis and Script Generation:
 1. Thoroughly analyze the given network task. If there's not enough information, ask for clarification before proceeding.
 2. Think deeply about the planned actions, potential impacts, and necessary precautions before writing any Netmiko script.
+
+ Here are some examples to learn from:
+    <examples>
+    # This Netmiko script autodetects the device type of a network device, establishes an SSH connection, and retrieves the device prompt. It uses SSHDetect for automatic device type detection and ConnectHandler for secure connection handling.
+
+    from netmiko import SSHDetect, ConnectHandler
+    from getpass import getpass
+
+    device = {
+        "device_type": "autodetect",
+        "host": "cisco1.lasthop.io",
+        "username": "pyclass",
+        "password": getpass(),
+    }
+
+    guesser = SSHDetect(**device)
+    best_match = guesser.autodetect()
+    print(best_match)  # Name of the best device_type to use further
+    print(guesser.potential_matches)  # Dictionary of the whole matching result
+    # Update the 'device' dictionary with the device_type
+    device["device_type"] = best_match
+
+    with ConnectHandler(**device) as connection:
+        print(connection.find_prompt())
+
+    # This Netmiko script connects to a Cisco IOS device, configures logging buffer size, saves the configuration, and prints the output. It uses secure password input and establishes a connection using SSH.
+
+    from netmiko import ConnectHandler
+    from getpass import getpass
+
+    device = {
+        "device_type": "cisco_ios",
+        "host": "cisco1.lasthop.io",
+        "username": "pyclass",
+        "password": getpass(),
+    }
+
+    commands = ["logging buffered 100000"]
+    with ConnectHandler(**device) as net_connect:
+        output = net_connect.send_config_set(commands)
+        output += net_connect.save_config()
+
+    print()
+    print(output)
+    print()
+
+    # This Netmiko script connects to a Cisco IOS device, executes the 'show ip int brief' command, and prints the cleaned output. It uses secure password input and automatic connection handling.
+
+    from netmiko import ConnectHandler
+    from getpass import getpass
+
+    cisco1 = {
+        "device_type": "cisco_ios",
+        "host": "cisco1.lasthop.io",
+        "username": "pyclass",
+        "password": getpass(),
+    }
+
+    # Show command that we execute
+    command = "show ip int brief"
+    with ConnectHandler(**cisco1) as net_connect:
+        output = net_connect.send_command(command)
+
+    # Automatically cleans-up the output so that only the show output is returned
+    print()
+    print(output)
+    print()
+
+    # This script uses Netmiko to establish an SSH connection to a Cisco IOS device, elevates privileges to enable mode, and prints the device prompt. It securely prompts for the user's password and enable secret.
+
+    from netmiko import ConnectHandler
+    from getpass import getpass
+
+    password = getpass()
+    secret = getpass("Enter secret: ")
+
+    cisco1 = {
+        "device_type": "cisco_ios",
+        "host": "cisco1.lasthop.io",
+        "username": "pyclass",
+        "password": password,
+        "secret": secret,
+    }
+
+    net_connect = ConnectHandler(**cisco1)
+    # Call 'enable()' method to elevate privileges
+    net_connect.enable()
+    print(net_connect.find_prompt())
+
+    # This Netmiko script connects to a Cisco IOS device, applies configuration changes from a file, saves the configuration, and prints the output. It uses secure password input and file-based configuration management.
+
+    from netmiko import ConnectHandler
+    from getpass import getpass
+
+    device1 = {
+        "device_type": "cisco_ios",
+        "host": "cisco1.lasthop.io",
+        "username": "pyclass",
+        "password": getpass(),
+    }
+
+    # File in same directory as script that contains
+    #
+    # $ cat config_changes.txt
+    # --------------
+    # logging buffered 100000
+    # no logging console
+
+    cfg_file = "config_changes.txt"
+    with ConnectHandler(**device1) as net_connect:
+        output = net_connect.send_config_from_file(cfg_file)
+        output += net_connect.save_config()
+
+    print()
+    print(output)
+    print()
+
+    # This Netmiko script connects to a Cisco IOS device, executes the "show ip interface brief" command, and prints the structured output using Genie parser. It demonstrates secure connection handling and command execution on network devices.
+
+    from getpass import getpass
+    from pprint import pprint
+    from netmiko import ConnectHandler
+
+    device = {
+        "device_type": "cisco_ios",
+        "host": "cisco1.lasthop.io",
+        "username": "pyclass",
+        "password": getpass(),
+    }
+
+    with ConnectHandler(**device) as net_connect:
+        output = net_connect.send_command("show ip interface brief", use_genie=True)
+
+    print()
+    pprint(output)
+    print()
+
+    # This Netmiko script connects to a Cisco IOS device, deletes a file from its flash memory using the 'delete' command, and handles the interactive prompts automatically. It uses send_command_timing for delay-based interactions and prints the output of the operation.
+
+    from netmiko import ConnectHandler
+    from getpass import getpass
+
+    cisco1 = {
+        "device_type": "cisco_ios",
+        "host": "cisco1.lasthop.io",
+        "username": "pyclass",
+        "password": getpass(),
+    }
+
+    command = "del flash:/test3.txt"
+    net_connect = ConnectHandler(**cisco1)
+
+    # CLI Interaction is as follows:
+    # cisco1#delete flash:/testb.txt
+    # Delete filename [testb.txt]?
+    # Delete flash:/testb.txt? [confirm]y
+
+    # Use 'send_command_timing' which is entirely delay based.
+    # strip_prompt=False and strip_command=False make the output
+    # easier to read in this context.
+    output = net_connect.send_command_timing(
+        command_string=command, strip_prompt=False, strip_command=False
+    )
+    if "Delete filename" in output:
+        output += net_connect.send_command_timing(
+            command_string="\n", strip_prompt=False, strip_command=False
+        )
+    if "confirm" in output:
+        output += net_connect.send_command_timing(
+            command_string="y", strip_prompt=False, strip_command=False
+        )
+    net_connect.disconnect()
+
+    print()
+    print(output)
+    print()
+
+    # This Netmiko script connects to a Cisco IOS device, deletes a file from its flash memory, and handles the interactive prompts during the deletion process. It demonstrates how to use Netmiko's send_command method with expect_string for managing multi-step CLI interactions.
+
+    from netmiko import ConnectHandler
+    from getpass import getpass
+
+    cisco1 = {
+        "device_type": "cisco_ios",
+        "host": "cisco1.lasthop.io",
+        "username": "pyclass",
+        "password": getpass(),
+    }
+
+    command = "del flash:/test4.txt"
+    net_connect = ConnectHandler(**cisco1)
+
+    # CLI Interaction is as follows:
+    # cisco1#delete flash:/testb.txt
+    # Delete filename [testb.txt]?
+    # Delete flash:/testb.txt? [confirm]y
+
+    # Use 'send_command' and the 'expect_string' argument (note, expect_string uses
+    # RegEx patterns). Netmiko will move-on to the next command when the
+    # 'expect_string' is detected.
+
+    # strip_prompt=False and strip_command=False make the output
+    # easier to read in this context.
+    output = net_connect.send_command(
+        command_string=command,
+        expect_string=r"Delete filename",
+        strip_prompt=False,
+        strip_command=False,
+    )
+    output += net_connect.send_command(
+        command_string="\n",
+        expect_string=r"confirm",
+        strip_prompt=False,
+        strip_command=False,
+    )
+    output += net_connect.send_command(
+        command_string="y", expect_string=r"#", strip_prompt=False, strip_command=False
+    )
+    net_connect.disconnect()
+
+    print()
+    print(output)
+    print()
+
+    # This Netmiko script connects to a Cisco IOS device, executes the 'show ip int brief' command using TextFSM for structured output, and prints the results.
+
+    from netmiko import ConnectHandler
+    from getpass import getpass
+    from pprint import pprint
+
+    cisco1 = {
+        "device_type": "cisco_ios",
+        "host": "cisco1.lasthop.io",
+        "username": "pyclass",
+        "password": getpass(),
+    }
+
+    command = "show ip int brief"
+    with ConnectHandler(**cisco1) as net_connect:
+        # Use TextFSM to retrieve structured data
+        output = net_connect.send_command(command, use_textfsm=True)
+
+    print()
+    pprint(output)
+    print()
+
+    </examples>
+
 3. When generating a Netmiko script:
    a. Use the provided device information and task details.
    b. Follow best practices for secure and efficient network management.
